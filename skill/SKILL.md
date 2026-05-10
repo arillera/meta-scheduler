@@ -5,7 +5,7 @@ description: Schedule Instagram + Facebook Page carousel posts to Meta Business 
 
 # meta-scheduler
 
-> Made by Antonio Automates and Claude to help you get your time back.
+> Made by [Antonio Automates](https://antonioautomates.com) and Claude to help you get your time back.
 
 This skill drives the local **meta-scheduler** tool (a Playwright-based Node.js project) to schedule carousel posts to Meta Business Suite. The tool itself lives outside the skill — typically at `~/code/meta-scheduler/` or wherever the user installed it.
 

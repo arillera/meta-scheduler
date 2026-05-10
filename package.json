@@ -13,7 +13,16 @@
     "batch": "node batch-schedule.js"
   },
   "keywords": ["meta", "instagram", "facebook", "scheduler", "playwright", "automation", "carousel"],
-  "author": "Antonio Automates and Claude",
+  "author": {
+    "name": "Antonio Automates",
+    "url": "https://antonioautomates.com"
+  },
+  "homepage": "https://antonioautomates.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arillera/meta-scheduler.git"
+  },
+  "bugs": "https://github.com/arillera/meta-scheduler/issues",
   "license": "MIT",
   "dependencies": {
     "playwright": "^1.59.1"

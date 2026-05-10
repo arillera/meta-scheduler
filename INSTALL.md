@@ -1,6 +1,6 @@
 # Installing meta-scheduler
 
-> Made by Antonio Automates and Claude to help you get your time back.
+> Made by [Antonio Automates](https://antonioautomates.com) and Claude to help you get your time back.
 
 Two install paths, depending on how you want to use it.
 

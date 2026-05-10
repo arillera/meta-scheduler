@@ -1,6 +1,6 @@
 # meta-scheduler
 
-> Made by Antonio Automates and Claude to help you get your time back.
+> Made by [Antonio Automates](https://antonioautomates.com) and Claude to help you get your time back.
 
 Schedule Instagram + Facebook Page carousel posts to **Meta Business Suite** without:
 
@@ -165,3 +165,7 @@ Now in Claude Code, asking *"schedule these 30 carousel posts to my Meta account
 ## License
 
 MIT — see `LICENSE`.
+
+---
+
+Built by [Antonio Automates](https://antonioautomates.com). If this saved you hours, the rest of what we build over there probably will too.
