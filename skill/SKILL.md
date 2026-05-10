@@ -1,13 +1,18 @@
 ---
 name: meta-scheduler
-description: Schedule Instagram + Facebook Page carousel posts to Meta Business Suite via the local meta-scheduler tool (Playwright-based). Use when the user wants to schedule one or many carousel posts ("schedule a post to IG/FB", "queue 30 carousels", "schedule these to Antonio Automates", "post to Meta Business Suite", "set up daily posts"). Multi-account — supports separate Meta accounts via per-account configs. Cross-posts to both Facebook Page and linked Instagram by default. Does NOT use the Meta Graph API.
+description: Schedule Instagram + Facebook Page carousel posts AND Reels (video posts) to Meta Business Suite via the local meta-scheduler tool (Playwright-based). Use when the user wants to schedule one or many image carousels OR video Reels ("schedule a post to IG/FB", "queue 30 carousels", "schedule a Reel", "post this video", "post to Meta Business Suite", "set up daily posts"). Auto-detects post type from the input folder: folder of images → carousel; folder with one .mp4/.mov → Reel. Multi-account — supports separate Meta accounts via per-account configs. Cross-posts to both Facebook Page and linked Instagram by default. Does NOT use the Meta Graph API.
 ---
 
 # meta-scheduler
 
 > Made by [Antonio Automates](https://antonioautomates.com) and Claude to help you get your time back.
 
-This skill drives the local **meta-scheduler** tool (a Playwright-based Node.js project) to schedule carousel posts to Meta Business Suite. The tool itself lives outside the skill — typically at `~/code/meta-scheduler/` or wherever the user installed it.
+This skill drives the local **meta-scheduler** tool (a Playwright-based Node.js project) to schedule carousel posts AND video Reels to Meta Business Suite. The tool itself lives outside the skill — typically at `~/meta-scheduler/` (the install script's default).
+
+**Post type is auto-detected from the input folder contents:**
+- folder of `.png`/`.jpg` → carousel (multi-slide post; uploaded one-at-a-time to preserve order)
+- folder with one `.mp4`/`.mov`/`.m4v`/`.webm` → Reel (single-video post via Meta's Reels composer)
+- mixed → rejected with an error
 
 ## When to invoke
 
@@ -16,13 +21,15 @@ Trigger when the user asks for any of:
 - "Schedule this carousel for Sunday at 9am to my Antonio Automates account"
 - "Queue 28 daily posts starting tomorrow"
 - "Post these 5 images + caption to IG and FB Page on May 15"
+- "Schedule this Reel for tomorrow"
+- "Post this video to my Page on Friday"
 - "Set up the next 30 days of carousel posts"
 - "Add a new client account and schedule their first post"
 
 Do **not** invoke for:
 
 - One-off comments / replies
-- Reels / Stories (the composer flow differs)
+- Stories (the composer flow differs; Reels ARE supported)
 - Account / page management (creating Pages, changing roles)
 - Anything Meta Graph API specific (the tool deliberately avoids the API to skip business verification)
 
@@ -110,6 +117,6 @@ Each account gets an isolated Chromium profile under `~/Library/Application Supp
 ## What the tool does not do
 
 - No Meta Graph API. No tokens.
-- No Reels, no Stories.
+- No Stories. (Reels are supported as of v1.1 — drop a single video file in a folder and the tool auto-routes through Meta's Reels composer.)
 - No edit / delete of existing scheduled posts (use the Meta Planner UI).
 - No cross-machine portability of profiles — each machine logs in once.

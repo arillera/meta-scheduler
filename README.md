@@ -2,7 +2,7 @@
 
 > Made by [Antonio Automates](https://antonioautomates.com) and Claude to help you get your time back.
 
-Schedule Instagram + Facebook Page carousel posts to **Meta Business Suite** without:
+Schedule Instagram + Facebook Page **carousel posts** AND **Reels (video posts)** to **Meta Business Suite** without:
 
 - Writing 30 posts by hand in the composer
 - Logging into the Graph API (no business verification, no app approval, no tokens)
@@ -14,15 +14,23 @@ Multi-account, batchable, Node.js + Playwright. Local-only — your Meta login l
 
 ## What it does
 
-Drives a Playwright-managed Chromium through Meta's web composer at `https://business.facebook.com/latest/composer/` to create a scheduled carousel post for both Instagram and the linked Facebook Page. Per post:
+Drives a Playwright-managed Chromium through Meta's web composer at `https://business.facebook.com/latest/composer/` to create a scheduled post on both Instagram and the linked Facebook Page.
 
-1. Open composer (auto-logged-in via persistent profile).
-2. Paste the caption.
-3. Upload each slide one at a time — preserves carousel order deterministically.
-4. Set date + time on both per-platform schedule rows (Facebook + Instagram).
-5. Click Schedule.
+**Auto-detects the post type** based on what's in the folder you point it at:
 
-Use the **batch** entry point to schedule many posts in one go (range mode for daily campaigns, JSON-plan mode for arbitrary timing). State is persisted, so a partial run can resume; failed posts can be retried in isolation.
+- Folder contains image files (`.png`, `.jpg`) → **carousel post**.
+  1. Paste caption
+  2. Upload each slide one at a time (preserves order deterministically)
+  3. Set date + time on both rows
+  4. Click Schedule
+- Folder contains a single video file (`.mp4`, `.mov`, `.m4v`, `.webm`) → **Reel post**.
+  1. Paste caption
+  2. Upload video → wait for Meta processing
+  3. Click Share tab → click Schedule pill
+  4. Set date + time on both rows
+  5. Click Schedule
+
+Use the **batch** entry point to schedule many posts in one go (range mode for daily campaigns, JSON-plan mode for arbitrary timing). State is persisted, so a partial run can resume; failed posts can be retried in isolation. Same batch logic works for carousels and Reels — each post's type is detected from its folder.
 
 ## Prerequisites
 
@@ -66,21 +74,33 @@ A Chromium window opens. Log into Meta, confirm the correct business is active i
 ## Schedule a single post
 
 ```bash
+# Carousel (folder of slides)
+node schedule-post.js --account myaccount \
+  --images "/abs/path/to/slides-folder" \
+  --caption "/abs/path/to/caption.md" \
+  --datetime "2026-05-10 09:00"
+
+# Reel (folder with one video)
+node schedule-post.js --account myaccount \
+  --images "/abs/path/to/folder-with-one-mp4" \
+  --caption "/abs/path/to/caption.md" \
+  --datetime "2026-05-10 09:00"
+
+# Day-NN convention from your account config
 node schedule-post.js --account myaccount \
   --day 01 --datetime "2026-05-10 09:00"
 
 # Dry-run = does everything except clicking Schedule, leaves browser open for inspection
 node schedule-post.js --account myaccount \
   --day 01 --datetime "2026-05-10 09:00" --dry-run
-
-# Manual asset paths instead of --day NN convention
-node schedule-post.js --account myaccount \
-  --images "/abs/path/to/slides-dir" \
-  --caption "/abs/path/to/caption.md" \
-  --datetime "2026-05-10 09:00"
 ```
 
-The `--day NN` form resolves images and caption from `carouselsRoot` using `imagesSubpath` and `captionSubpath`. With the default sample paths, Day-NN means `<root>/Finals/Day-NN/*.png` for slides and `<root>/Day-NN/caption.md` for caption.
+The `--images` flag points at a folder. The folder's contents determine the post type:
+- **All images** → carousel (multiple slides, alphabetical order)
+- **One video file** → Reel
+- Mixing images + videos in one folder is rejected.
+
+The `--day NN` form resolves the folder + caption from `carouselsRoot` using `imagesSubpath` and `captionSubpath` in your account config.
 
 ## Batch — daily campaign
 

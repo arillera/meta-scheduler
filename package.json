@@ -1,7 +1,7 @@
 {
   "name": "meta-scheduler",
-  "version": "1.0.0",
-  "description": "Made by Antonio Automates and Claude to help you get your time back. Schedule Instagram + Facebook Page carousel posts to Meta Business Suite via Playwright. Multi-account, batchable, no Meta Graph API required.",
+  "version": "1.1.0",
+  "description": "Made by Antonio Automates and Claude to help you get your time back. Schedule Instagram + Facebook Page carousel posts AND video Reels to Meta Business Suite via Playwright. Multi-account, batchable, no Meta Graph API required.",
   "type": "module",
   "bin": {
     "meta-scheduler": "schedule-post.js",

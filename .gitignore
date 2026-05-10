@@ -5,3 +5,4 @@ state/
 accounts/*.json
 !accounts/example.json
 .DS_Store
+probe/

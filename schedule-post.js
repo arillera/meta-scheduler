@@ -85,11 +85,22 @@ function extractCaption(filePath, startLine) {
   return captionLines.join('\n');
 }
 
-function listSlides(dir) {
-  return readdirSync(dir)
-    .filter((f) => /\.(png|jpe?g)$/i.test(f))
-    .sort()
-    .map((f) => join(dir, f));
+const IMAGE_RX = /\.(png|jpe?g)$/i;
+const VIDEO_RX = /\.(mp4|mov|m4v|webm)$/i;
+
+function listMedia(dir) {
+  const all = readdirSync(dir).sort();
+  const images = all.filter((f) => IMAGE_RX.test(f)).map((f) => join(dir, f));
+  const videos = all.filter((f) => VIDEO_RX.test(f)).map((f) => join(dir, f));
+  if (videos.length > 0 && images.length > 0) {
+    throw new Error(`Folder ${dir} mixes videos and images. Use one or the other per post.`);
+  }
+  if (videos.length > 1) {
+    throw new Error(`Folder ${dir} has ${videos.length} videos. Meta Reels are single-video; put one video per folder.`);
+  }
+  if (videos.length === 1) return { kind: 'reel', paths: videos };
+  if (images.length > 0) return { kind: 'carousel', paths: images };
+  throw new Error(`No images (.png/.jpg) or videos (.mp4/.mov) found in ${dir}`);
 }
 
 function validateDatetime(s) {
@@ -298,6 +309,37 @@ async function uploadSlides(page, slidePaths) {
   await page.waitForTimeout(3000);
 }
 
+async function uploadVideo(page, videoPath) {
+  console.log(`[upload] Uploading video: ${videoPath.split('/').pop()}`);
+  const addBtn = page.getByRole('button', { name: /^add\s*video/i }).first();
+  await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+  await addBtn.click();
+  await page.waitForTimeout(900);
+
+  // Try input directly, then fallback to filechooser via "Upload from desktop"
+  if (await trySetInputFiles(page, [videoPath], 'video post-dropdown')) {
+    /* mounted directly */
+  } else {
+    const uploadItem = page.getByText('Upload from desktop', { exact: false }).first();
+    const chooserP = page
+      .waitForEvent('filechooser', { timeout: 15000 })
+      .then((c) => ({ kind: 'chooser', c }))
+      .catch(() => null);
+    await uploadItem.click();
+    await page.waitForTimeout(500);
+    if (!(await trySetInputFiles(page, [videoPath], 'video post-click'))) {
+      const result = await chooserP;
+      if (!result) throw new Error('Video upload failed: no filechooser, no input mounted.');
+      await result.c.setFiles([videoPath]);
+      console.log('[upload] video setFiles via filechooser');
+    }
+  }
+  // Reels need real processing time on Meta's side. Be generous.
+  console.log('[upload] Waiting up to 90s for video to process…');
+  await page.waitForTimeout(60000);
+  // Composer should now be in the Reel "Create" view. Move on.
+}
+
 async function ensurePostToChecked(page) {
   // Look for checkboxes labelled with the page name and Instagram.
   // Don't fail hard — just log what we see.
@@ -365,26 +407,33 @@ function formatDateForInput(date) {
 }
 
 function dateReadbackCandidates(date) {
-  // Meta uses short month names ("Jun 1, 2026") for some months and long ("May 11, 2026") for others.
-  // Accept either as valid for the readback check.
+  // Meta's date input value format varies:
+  //   - Carousel composer commits as long form: "May 11, 2026" / abbreviated for 4+ letter months ("Jun 1, 2026")
+  //   - Reel composer sometimes commits as raw M/D/YYYY: "5/11/2026"
   const day = date.getDate();
+  const month = date.getMonth() + 1;
   const year = date.getFullYear();
   const longMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
   const shortMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(date);
   return [
     `${longMonth} ${day}, ${year}`,
     `${shortMonth} ${day}, ${year}`,
+    `${month}/${day}/${year}`,
+    `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`,
   ];
 }
 
 async function setRowDate(page, rowIndex, dateString, expectedReadbacks) {
-  // Date inputs are <input> elements whose `value` matches "Month D, YYYY"
+  // Date inputs are <input> elements with placeholder="mm/dd/yyyy" (the carousel + reel composers).
+  // Their value displays the current date in long form ("May 10, 2026") or raw M/D/YYYY in some modes.
   const handles = await page.evaluateHandle(() => {
     const matches = [];
     for (const el of document.querySelectorAll('input')) {
-      if (typeof el.value === 'string' && /^[A-Z][a-z]+ \d{1,2}, \d{4}$/.test(el.value)) {
-        matches.push(el);
-      }
+      const ph = el.getAttribute('placeholder') || '';
+      const isDate = ph.toLowerCase().includes('mm/dd/yyyy') ||
+        /^[A-Z][a-z]+ \d{1,2}, \d{4}$/.test(el.value || '') ||
+        /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(el.value || '');
+      if (isDate) matches.push(el);
     }
     return matches;
   });
@@ -396,17 +445,13 @@ async function setRowDate(page, rowIndex, dateString, expectedReadbacks) {
   }
   const target = arr[rowIndex];
 
-  // Click + select-all + type MM/DD/YYYY. Press Tab to commit and defocus.
+  // Use Playwright's fill() — it handles React-controlled inputs properly (select-all + type + change event).
   await target.click();
-  await page.waitForTimeout(150);
-  await target.press('Meta+a').catch(() => {});
-  await page.waitForTimeout(80);
-  await page.keyboard.press('Delete');
-  await page.waitForTimeout(80);
-  await page.keyboard.type(dateString, { delay: 30 });
+  await page.waitForTimeout(200);
+  await target.fill(dateString);
   await page.waitForTimeout(200);
   await page.keyboard.press('Tab');
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
 
   const after = await target.evaluate((el) => el.value);
   const acceptable = Array.isArray(expectedReadbacks) ? expectedReadbacks : [expectedReadbacks];
@@ -509,9 +554,55 @@ async function setSchedule(page, dt) {
   await page.waitForTimeout(800);
 }
 
-async function clickSchedule(page) {
-  const btn = page.getByRole('button', { name: /^schedule$/i }).first();
-  await btn.click();
+async function setReelSchedule(page, dt) {
+  console.log('[schedule] Reel flow: clicking Share tab…');
+  const shareTab = page.locator('div[role="button"]', { hasText: /^Share$/ }).first();
+  await shareTab.click({ force: true });
+  await page.waitForTimeout(2500);
+
+  console.log('[schedule] Clicking "Schedule" pill…');
+  // The "Schedule" pill is in the Scheduling-options row near the top of the Share tab.
+  // First match by document order = the pill (Schedule button at bottom-right comes later in DOM).
+  const candidates = [
+    page.getByRole('tab', { name: /^schedule$/i }),
+    page.getByRole('button', { name: /^schedule$/i }),
+    page.locator('div[role="button"]', { hasText: /^Schedule$/ }),
+  ];
+  let clicked = false;
+  for (const loc of candidates) {
+    if (await loc.count()) { await loc.first().click({ force: true }); clicked = true; break; }
+  }
+  if (!clicked) throw new Error('Could not find Schedule pill on Share tab.');
+  await page.waitForTimeout(2000);
+
+  const stamp = Date.now();
+  const shotPath = join(screenshotsDir, `reel-schedule-region-${stamp}.png`);
+  await page.screenshot({ path: shotPath, fullPage: true }).catch(() => {});
+  console.log(`[schedule] full-page snapshot: ${shotPath}`);
+
+  const dateTyped = formatDateForInput(dt.date);
+  const dateExpect = dateReadbackCandidates(dt.date);
+  const hourCount = await page.locator('input[role="spinbutton"][aria-label="hours"]').count();
+  console.log(`[schedule] Found ${hourCount} schedule rows. Typing "${dateTyped}" → expect one of ${JSON.stringify(dateExpect)}, ${dt.hourInt}:${String(dt.minuteInt).padStart(2, '0')}…`);
+  if (hourCount === 0) throw new Error('No hours spinbutton found on Reel Share tab — UI may have changed.');
+  for (let i = 0; i < hourCount; i++) {
+    await setRowDate(page, i, dateTyped, dateExpect);
+    await setTimeOnRow(page, i, dt.hourInt, dt.minuteInt);
+    console.log(`[schedule] Row ${i} date+time set.`);
+  }
+  await page.waitForTimeout(800);
+}
+
+async function clickSchedule(page, kind) {
+  if (kind === 'reel') {
+    // Reels have TWO "Schedule"s: the pill (already clicked) and the bottom-right button.
+    // Pill comes first in document order; the bottom commit button is .last().
+    const btn = page.locator('div[role="button"]', { hasText: /^Schedule$/ }).last();
+    await btn.click({ force: true });
+  } else {
+    const btn = page.getByRole('button', { name: /^schedule$/i }).first();
+    await btn.click();
+  }
   await page.waitForTimeout(2500);
 }
 
@@ -539,15 +630,14 @@ async function run() {
     ? parseInt(values['caption-start-line'], 10)
     : (account.captionStartLine || 5);
   const caption = extractCaption(captionFile, captionStartLine);
-  const slides = listSlides(imagesDir);
-  if (slides.length === 0) throw new Error(`No slides in ${imagesDir}`);
+  const media = listMedia(imagesDir);
 
   console.log(`
 [plan]
   Account:   ${account.name} (${account.displayName})
   Day:       ${day || '(manual)'}
-  Images:    ${slides.length} files from ${imagesDir}
-             ${slides.map((s) => '  - ' + s.split('/').pop()).join('\n')}
+  Media:     ${media.kind.toUpperCase()} — ${media.paths.length} file(s) from ${imagesDir}
+             ${media.paths.map((s) => '  - ' + s.split('/').pop()).join('\n')}
   Caption:   ${caption.length} chars from ${captionFile}
   Datetime:  ${dt.date.toString()}
   Page:      ${config.pageName}
@@ -579,13 +669,16 @@ async function run() {
     console.log('[caption] Pasting caption…');
     await pasteCaption(page, caption);
 
-    await uploadSlides(page, slides);
-    console.log('[upload] Waiting for thumbnails to finalize…');
-    await page.waitForTimeout(8000);
-
-    await ensurePostToChecked(page);
-
-    await setSchedule(page, dt);
+    if (media.kind === 'reel') {
+      await uploadVideo(page, media.paths[0]);
+      await setReelSchedule(page, dt);
+    } else {
+      await uploadSlides(page, media.paths);
+      console.log('[upload] Waiting for thumbnails to finalize…');
+      await page.waitForTimeout(8000);
+      await ensurePostToChecked(page);
+      await setSchedule(page, dt);
+    }
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const screenshotPath = join(screenshotsDir, `${day ? `day-${String(day).padStart(2, '0')}` : 'manual'}-${stamp}.png`);
@@ -599,7 +692,7 @@ async function run() {
     }
 
     console.log('[schedule] Clicking Schedule…');
-    await clickSchedule(page);
+    await clickSchedule(page, media.kind);
     const after = join(screenshotsDir, `${day ? `day-${String(day).padStart(2, '0')}` : 'manual'}-${stamp}-after.png`);
     await page.screenshot({ path: after, fullPage: true });
     console.log(`[done] Post-schedule screenshot: ${after}`);
