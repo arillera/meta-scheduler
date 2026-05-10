@@ -1,0 +1,7 @@
+node_modules/
+screenshots/
+state/
+# Personal account configs — only example.json should be committed.
+accounts/*.json
+!accounts/example.json
+.DS_Store

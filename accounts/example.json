@@ -1,0 +1,11 @@
+{
+  "name": "example",
+  "displayName": "Example Brand",
+  "pageName": "Your Facebook Page Name (must match exactly)",
+  "carouselsRoot": "../../my-content/example",
+  "imagesSubpath": "Finals/Day-{day}",
+  "captionSubpath": "Day-{day}/caption.md",
+  "captionStartLine": 5,
+  "platforms": ["facebook", "instagram"],
+  "timezone": "America/New_York"
+}
