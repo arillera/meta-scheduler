@@ -98,7 +98,16 @@ JSON
   echo -e "${GREEN}✓${NC} Created accounts/myaccount.json for \"$PAGE_NAME\""
 fi
 
-# 8. Login (opens browser, blocks until user closes window)
+# 8. Symlink the Claude Code skill (harmless if Claude Code isn't installed)
+SKILL_TARGET="$HOME/.claude/skills/meta-scheduler"
+mkdir -p "$HOME/.claude/skills"
+if [[ -e "$SKILL_TARGET" || -L "$SKILL_TARGET" ]]; then
+  rm -rf "$SKILL_TARGET"
+fi
+ln -s "$INSTALL_DIR/skill" "$SKILL_TARGET"
+echo -e "${GREEN}✓${NC} Claude Code skill linked at $SKILL_TARGET"
+
+# 9. Login (opens browser, blocks until user closes window)
 echo ""
 echo -e "${BOLD}Last step: log into Meta.${NC}"
 echo ""
@@ -110,20 +119,21 @@ echo ""
 read -p "Press Enter to open the browser… " </dev/tty
 node schedule-post.js --account myaccount --setup
 
-# 9. Done
+# 10. Done
 echo ""
 echo -e "${GREEN}${BOLD}🎉 You're all set up.${NC}"
 echo ""
-echo "To schedule a post, see the README at:"
-echo "  https://github.com/arillera/meta-scheduler#schedule-a-single-post"
+echo -e "${BOLD}Easiest way to schedule posts:${NC} ask Claude (Claude Code, claude.ai/code)."
+echo "  Try: \"Schedule a carousel post to my Meta account for tomorrow at 9am.\""
+echo "  Claude will pick up the meta-scheduler skill automatically and ask you for the rest."
 echo ""
-echo "Quick example — schedule one carousel post:"
-echo ""
+echo -e "${BOLD}Or run the command yourself:${NC}"
 echo -e "  ${BOLD}cd ~/meta-scheduler${NC}"
 echo -e "  ${BOLD}node schedule-post.js --account myaccount \\${NC}"
 echo -e "  ${BOLD}  --images \"/path/to/your/images-folder\" \\${NC}"
-echo -e "  ${BOLD}  --caption \"/path/to/your/caption.md\" \\${NC}"
+echo -e "  ${BOLD}  --caption \"/path/to/your/caption.txt\" \\${NC}"
 echo -e "  ${BOLD}  --datetime \"2026-06-01 09:00\"${NC}"
 echo ""
-echo "Need help? Open an issue: https://github.com/arillera/meta-scheduler/issues"
+echo "Full docs: https://github.com/arillera/meta-scheduler#readme"
+echo "Help / questions: https://github.com/arillera/meta-scheduler/issues"
 echo ""
