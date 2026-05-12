@@ -334,10 +334,9 @@ async function uploadVideo(page, videoPath) {
       console.log('[upload] video setFiles via filechooser');
     }
   }
-  // Reels need real processing time on Meta's side. Be generous.
-  console.log('[upload] Waiting up to 90s for video to process…');
-  await page.waitForTimeout(60000);
-  // Composer should now be in the Reel "Create" view. Move on.
+  // Initial wait so the upload has a chance to start before we begin polling.
+  await page.waitForTimeout(5000);
+  console.log('[upload] (Will poll for Share-tab readiness during setReelSchedule.)');
 }
 
 async function ensurePostToChecked(page) {
@@ -555,10 +554,24 @@ async function setSchedule(page, dt) {
 }
 
 async function setReelSchedule(page, dt) {
-  console.log('[schedule] Reel flow: clicking Share tab…');
+  console.log('[schedule] Reel flow: waiting for Share tab to be reachable…');
+  // Click Share repeatedly until the page actually shows the Share view (signaled by "Scheduling options").
   const shareTab = page.locator('div[role="button"]', { hasText: /^Share$/ }).first();
-  await shareTab.click({ force: true });
-  await page.waitForTimeout(2500);
+  const start = Date.now();
+  const TIMEOUT = 5 * 60 * 1000;
+  let onShareTab = false;
+  while (Date.now() - start < TIMEOUT) {
+    await shareTab.click({ force: true }).catch(() => {});
+    await page.waitForTimeout(2500);
+    const haveScheduling = await page.getByText(/scheduling options/i).count().catch(() => 0);
+    if (haveScheduling > 0) {
+      const elapsed = Math.round((Date.now() - start) / 1000);
+      console.log(`[schedule] On Share tab after ${elapsed}s.`);
+      onShareTab = true;
+      break;
+    }
+  }
+  if (!onShareTab) throw new Error('Could not reach Share tab within 5 minutes — video may still be processing.');
 
   console.log('[schedule] Clicking "Schedule" pill…');
   // The "Schedule" pill is in the Scheduling-options row near the top of the Share tab.
